@@ -63,10 +63,27 @@ export function GameScreen({ navigation, route }) {
       setStack(prevStack => [ ...prevStack, data.card ])
     } else if (data.type === "setPlayerList") {
       setPlayerList(data.playerList)
+    } else if (data.type === "matchEnded") {
+      setPlayerList(data.winners)
     }
   }
   
   const [ ws, setWs ] = React.useState(new WebSocket(`ws://${route.params.addr}:777`)) //(() => {
+
+  useEffect(() => {
+    navigation.setOptions({ headerRight: () => {
+      return <>
+      <Appbar.Action color="black" disabled={!stack.length && matchState !== MatchState.NOT_STARTED} key="showStack" icon="format-list-numbered" onPress={() => {
+        navigation.push("Stack", { stack })
+      }} />
+      <Appbar.Action color="black" key="refresh" icon="refresh" onPress={() => {
+        setTable([])
+        setHand([])
+        ws.send(JSON.stringify({ type: "getCurrentState" }))
+      }} />
+      </>
+    }})
+  }, [stack])
 
 
   useEffect(() => {
@@ -89,11 +106,23 @@ export function GameScreen({ navigation, route }) {
       handleMessageData(JSON.parse(ev.data))
     }
 
-    navigation.setOptions({ headerRight: () => <Appbar.Action key="refresh" icon="refresh" onPress={() => {
-      setTable([])
-      setHand([])
-      ws.send(JSON.stringify({ type: "getCurrentState" }))
-    }} />})
+    navigation.setOptions({ headerRight: () => <>
+      <Appbar.Action color="black" disabled={!stack.length || matchState === MatchState.NOT_STARTED} key="showStack" icon="format-list-numbered" onPress={() => {
+        navigation.push("Stack", { stack })
+      }} />
+      <Appbar.Action color="black" key="refresh" icon="refresh" onPress={() => {
+        setTable([])
+        setHand([])
+        ws.send(JSON.stringify({ type: "getCurrentState" }))
+      }} />
+    </>})
+
+    return () => {
+      ws.onopen = undefined
+      ws.onclose = undefined
+      ws.onmessage = undefined
+      ws.close()
+    }
   }, [])
 
 
@@ -107,7 +136,8 @@ export function GameScreen({ navigation, route }) {
       <Title style={{textAlign: "right"}}>Briscola</Title>
       <Card elevation={3} style={{ position: "absolute", top: 0, right: 0, height: 205, width: 115, backgroundColor: "white", marginTop: 35}}>
         <Text style={{ textAlign: "center", margin: 10, position: "absolute", top: 0, right: 0, left: 0, bottom: 0, color: "black", textTransform: "uppercase", fontSize: 72 }}>{GameCard.getSignEmoji(trumpCard.sign)}</Text>
-        <Text style={{ textAlign: "center", margin: 10, position: "absolute", bottom: 0, right: 0, left: 0, color: "black", textTransform: "uppercase", fontSize: 18, fontWeight: "700" }}>{GameCard.getTypeName(trumpCard.type)}</Text>
+        { GameCard.getPoints(trumpCard.type)>0 && <Text style={{ textAlign: "center", color: "#aaa", fontWeight: "700", fontSize: 18, position: "absolute", right: 0, left: 0, bottom: 10 }}>{GameCard.getPoints(trumpCard.type)}</Text>}
+        <Text style={{ textAlign: "center", position: "absolute", bottom: 30, right: 0, left: 0, textTransform: "uppercase", fontSize: 18, fontWeight: "700", color: GameCard.getPoints(trumpCard.type)>0 ? "orange" : "black" }}>{GameCard.getTypeName(trumpCard.type)}</Text>
       </Card>
     </View> }
 
@@ -124,7 +154,8 @@ export function GameScreen({ navigation, route }) {
           contentContainerStyle={{flexGrow: 1, justifyContent: 'center'}}
           renderItem={({ item }) => <Card elevation={4} style={{ height: 205, width: 115, backgroundColor: "white", marginRight: 10, marginBottom: 10 }}>
             <Text style={{ textAlign: "center", margin: 10, position: "absolute", top: 0, right: 0, left: 0, bottom: 0, color: "black", textTransform: "uppercase", fontSize: 72 }}>{GameCard.getSignEmoji(item.sign)}</Text>
-            <Text style={{ textAlign: "center", margin: 10, position: "absolute", bottom: 0, right: 0, left: 0, color: "black", textTransform: "uppercase", fontSize: 18, fontWeight: "700" }}>{GameCard.getTypeName(item.type)}</Text>
+            { GameCard.getPoints(item.type)>0 && <Text style={{ textAlign: "center", color: "#aaa", fontWeight: "700", fontSize: 18, position: "absolute", right: 0, left: 0, bottom: 10 }}>{GameCard.getPoints(item.type)}</Text>}
+            <Text style={{ textAlign: "center", position: "absolute", bottom: 30, right: 0, left: 0, textTransform: "uppercase", fontSize: 18, fontWeight: "700", color: GameCard.getPoints(item.type)>0 ? "orange" : "black" }}>{GameCard.getTypeName(item.type)}</Text>
           </Card>}
         />
       </View>
@@ -135,7 +166,7 @@ export function GameScreen({ navigation, route }) {
     </> }
 
 
-    <View style={{ position: "absolute", display: "flex", flexDirection: "column", bottom: 10, left: 0, right: 0, height: "33%", paddingVertical: 20 }}>
+    <View style={{ position: "absolute", display: "flex", flexDirection: "column", bottom: 10, left: 0, right: 0, paddingVertical: 20 }}>
       <FlatList
           data={hand}
           horizontal
@@ -144,15 +175,16 @@ export function GameScreen({ navigation, route }) {
           keyExtractor={(i, idx) => idx.toString()}
           contentContainerStyle={{flexGrow: 1, justifyContent: 'center'}}
           initialNumToRender={6}
-          renderItem={({ item }) => <Card elevation={4} style={{ marginHorizontal: 10, flex: 1, backgroundColor: "white" }}>
-            <TouchableOpacity style={{ width: 115, height: 205 }} onPress={ev => {
+          renderItem={({ item }) => <Card elevation={4} style={{ width: 115, height: 205, marginHorizontal: 10, flex: 1, backgroundColor: "white" }}>
+            <TouchableOpacity style={{ width: "100%", height: "100%" }} onPress={ev => {
               ws.send(JSON.stringify({
                 type: "playCard",
                 card: item
               }))
             }}>
               <Text style={{ textAlign: "center", margin: 10, position: "absolute", top: 0, right: 0, left: 0, bottom: 0, color: "black", textTransform: "uppercase", fontSize: 72 }}>{GameCard.getSignEmoji(item.sign)}</Text>
-              <Text style={{ textAlign: "center", margin: 10, position: "absolute", bottom: 0, right: 0, left: 0, color: "black", textTransform: "uppercase", fontSize: 18, fontWeight: "700" }}>{GameCard.getTypeName(item.type)}</Text>
+              { GameCard.getPoints(item.type)>0 && <Text style={{ textAlign: "center", color: "#aaa", fontWeight: "700", fontSize: 18, position: "absolute", right: 0, left: 0, bottom: 10 }}>{GameCard.getPoints(item.type)}</Text>}
+              <Text style={{ textAlign: "center", position: "absolute", bottom: 30, right: 0, left: 0, textTransform: "uppercase", fontSize: 18, fontWeight: "700", color: GameCard.getPoints(item.type)>0 ? "orange" : "black" }}>{GameCard.getTypeName(item.type)}</Text>
             </TouchableOpacity>
           </Card>}
         />

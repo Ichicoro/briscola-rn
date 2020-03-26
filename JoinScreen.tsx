@@ -22,7 +22,8 @@ export function JoinScreen({ navigation, route }) {
       
       <Button mode="contained" onPress={() => {
         if (Platform.OS != 'web') Haptics.selectionAsync()
-        route.params?.setLoginData({ addr: addr, username: username })
+        navigation.navigate("Home", { addr: addr, username: username })
+        // route.params?.setLoginData()
       }} style={{ marginBottom: 40 }} disabled={username == "" || addr == ""}>Join</Button>
     </ScrollView>
     <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 80, padding: 20 }}>

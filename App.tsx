@@ -7,10 +7,11 @@ import { Appbar, DefaultTheme, Provider as PaperProvider, Button as MatButton, D
 import { Header } from './Header';
 import { JoinScreen } from './JoinScreen';
 import { GameScreen } from './GameScreen';
+import { StackScreen } from './StackScreen'
 import { AppearanceProvider, useColorScheme } from 'react-native-appearance';
 import 'react-native-gesture-handler';
 
-const Stack = createStackNavigator(); 
+const Stack = createStackNavigator();
 
 const lightTheme: Theme = {
   ...DefaultTheme,
@@ -45,11 +46,6 @@ export function SettingsPage() {
 }
 
 export default function App() {
-  const [ loginData, setLoginData ] = React.useState({
-    addr: null,
-    username: null
-  })
-
   let colorScheme = useColorScheme();
 
   return (
@@ -57,7 +53,7 @@ export default function App() {
     <PaperProvider theme={ colorScheme === "dark" ? darkTheme : lightTheme }>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName={loginData.addr ? "Home" : "Join"}
+          initialRouteName={"Join"}
           screenOptions={{
             header: ({ scene, previous, navigation }) => (
               <Header scene={scene} previous={previous} navigation={navigation} />
@@ -65,26 +61,22 @@ export default function App() {
           }}
           headerMode="screen"
         >
-          { loginData.addr ? 
-            <Stack.Screen name="Home" key="home" component={GameScreen} initialParams={{ ...loginData }} options={({ navigation }) => ({
-              headerLeft: () => [
-                <Appbar.Action key="close" icon="close" onPress={() => setLoginData({ addr: null, username: null })} />
-              ],
-              headerRight: () => [
-                // <Appbar.Action key="settings" icon="settings" onPress={() => navigation.push("Settings")} />
-              ],
-              title: "Playing",
-            })} /> : <Stack.Screen key="join" name="Join" component={JoinScreen} initialParams={{
-              setLoginData
-            }} options={({navigation}) => ({
-              title: "Briscolino",
-              subtitle: "v1.0",
-              headerRight: () => [
-                <Appbar.Action key="settings" icon="settings" onPress={() => navigation.push("Settings")} />
-              ],
-              animationTypeForReplace: !loginData.addr ? 'pop' : 'push'
-            })} />
-          }
+          <Stack.Screen key="join" name="Join" component={JoinScreen} options={({navigation}) => ({
+            title: "Briscolino",
+            subtitle: "v1.0",
+            // headerRight: () => [
+            //   <Appbar.Action key="settings" icon="settings" onPress={() => navigation.push("Settings")} />
+            // ],
+            // animationTypeForReplace: !loginData.addr ? 'pop' : 'push'
+          })} />
+          <Stack.Screen name="Home" key="home" component={GameScreen} /*initialParams={{ ...loginData }}*/ options={({ navigation }) => ({
+            title: "Playing",
+            gestureEnabled: false,
+            
+          })} />
+          <Stack.Screen name="Stack" key="home" component={StackScreen} options={({ navigation }) => ({
+            title: "Stack"
+          })}/>
           <Stack.Screen name="Settings" key="settings" component={SettingsPage}/>
         </Stack.Navigator>
       </NavigationContainer>
