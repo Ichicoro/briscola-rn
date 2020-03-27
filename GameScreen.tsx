@@ -8,17 +8,17 @@ import Mutex from './Mutex'
 import * as Haptics from 'expo-haptics';
 
 
-function PlayerBoard({ players }) {
+function PlayerBoard({ players, matchState }) {
   console.log(players)
   return <Card style={{ width: "100%", height: "100%"}} elevation={4}><DataTable>
     <DataTable.Header>
       <DataTable.Title>Player</DataTable.Title>
-      { players[0]?.points !== undefined && <DataTable.Title numeric>Score</DataTable.Title> }
+      { matchState === MatchState.ENDED && <DataTable.Title numeric>Score</DataTable.Title> }
     </DataTable.Header>
 
     { players.map(player => <DataTable.Row>
       <DataTable.Cell>{ player.username }</DataTable.Cell>
-      { player.points !== undefined && <DataTable.Cell numeric>{player.points}</DataTable.Cell> }
+      { matchState === MatchState.ENDED && <DataTable.Cell numeric>{player.points}</DataTable.Cell> }
     </DataTable.Row>)}
   </DataTable></Card>
 }
@@ -142,7 +142,7 @@ export function GameScreen({ navigation, route }) {
   return <Surface style={{ width: "100%", height: "100%" }}>
 
     { matchState !== MatchState.PLAYING && <View style={{ flex: 1, alignItems: "center", justifyContent: "center"}}>
-        <PlayerBoard players={playerList} />
+        <PlayerBoard players={playerList} matchState={matchState} />
       </View> }
 
     { (trumpCard && matchState === MatchState.PLAYING) && <View style={{ position: "absolute", top: 0, right: 0, height: 205, width: 115, margin: 15 }}>
