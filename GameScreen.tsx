@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { View, FlatList, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { View, FlatList, ScrollView, TouchableOpacity, Platform, AsyncStorage, Alert } from 'react-native';
 import { Button, TextInput, Title, Text, Surface, Snackbar, FAB, Card, Appbar, DataTable } from 'react-native-paper';
 import { useTheme } from '@react-navigation/native';
 import { MatchState } from './match'
@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 
 
 function PlayerBoard({ players }) {
+  console.log(players)
   return <Card style={{ width: "100%", height: "100%"}} elevation={4}><DataTable>
     <DataTable.Header>
       <DataTable.Title>Player</DataTable.Title>
@@ -16,7 +17,7 @@ function PlayerBoard({ players }) {
     </DataTable.Header>
 
     { players.map(player => <DataTable.Row>
-      <DataTable.Cell>{player.username}</DataTable.Cell>
+      <DataTable.Cell>{ player.username }</DataTable.Cell>
       { player.points !== undefined && <DataTable.Cell numeric>{player.points}</DataTable.Cell> }
     </DataTable.Row>)}
   </DataTable></Card>
@@ -31,30 +32,31 @@ export function GameScreen({ navigation, route }) {
   const [ table, setTable ] = React.useState([])
   const [ stack, setStack ] = React.useState([])
   const [ playerList, setPlayerList ] = React.useState([])
+  const [ cardsAreEnabled, setCardsAreEnabled ] = React.useState(true)
 
   console.log(hand)
 
   const handleMessageData = async data => {
     if (data.type === "setTrumpCard" && data.trumpCard != null) {
-      setSnackbarText("Set trump card!")
       setTrumpCard(GameCard.fromData(data.trumpCard))
     } else if (data.type === "state") {
       setMatchState(data.state)
     } else if (data.type === "dealtCard") {
-      // Ugh...
-      // const unlock = await handMutex.acquire()
       setHand(prevHand => [ ...prevHand, GameCard.fromData(data.card) ].filter((a, b, i) => i.indexOf(a) === b))
-      // unlock()
     } else if (data.type === "playedCard") {
       setTable(prevTable => [ ...prevTable, GameCard.fromData(data.card) ].filter((a, b, i) => i.indexOf(a) === b))
-      // navigation.setOptions({ subtitle: `Next player: ${data.nextPlayer}`})
+      navigation.setOptions({ subtitle: `Next player: ${data.nextPlayer}`})
       console.log(data)
     } else if (data.type === "removeCard") {
       setHand(prevHand => prevHand.filter(c => !c.equals(data.card)))
     } else if (data.type === "announcement") {
       setSnackbarText(data.message)
     } else if (data.type === "clearTable") {
-      setTable([])
+      setCardsAreEnabled(false)
+      setTimeout(() => {
+        setTable([])
+        setCardsAreEnabled(true)
+      }, 1750)
     } else if (data.type === "clearHand") {
       setHand([])
     } else if (data.type === "nextPlayer") {
@@ -65,6 +67,8 @@ export function GameScreen({ navigation, route }) {
       setPlayerList(data.playerList)
     } else if (data.type === "matchEnded") {
       setPlayerList(data.winners)
+      setMatchState(MatchState.ENDED)
+      navigation.setOptions({ title: "Match ended", subtitle: `Winner: ${data.winners[0].username}` })
     }
   }
   
@@ -80,6 +84,7 @@ export function GameScreen({ navigation, route }) {
         setTable([])
         setHand([])
         ws.send(JSON.stringify({ type: "getCurrentState" }))
+        if (Platform.OS != 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       }} />
       </>
     }})
@@ -94,9 +99,15 @@ export function GameScreen({ navigation, route }) {
         username: route.params.username
       }))
       if (Platform.OS != 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+
+      AsyncStorage.setItem("default_username", route.params.username)
+      AsyncStorage.setItem("default_addr", route.params.addr)
     }
 
     ws.onclose = ev => {
+      if (ev.reason === "match_in_progress") {
+        Alert.alert("Match is already in progress", "Please wait for the match to end.")
+      }
       setSnackbarText("ERROR! Please rejoin :(")
       if (Platform.OS != 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
     }
@@ -109,11 +120,13 @@ export function GameScreen({ navigation, route }) {
     navigation.setOptions({ headerRight: () => <>
       <Appbar.Action color="black" disabled={!stack.length || matchState === MatchState.NOT_STARTED} key="showStack" icon="format-list-numbered" onPress={() => {
         navigation.push("Stack", { stack })
+        if (Platform.OS != 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
       }} />
       <Appbar.Action color="black" key="refresh" icon="refresh" onPress={() => {
         setTable([])
         setHand([])
         ws.send(JSON.stringify({ type: "getCurrentState" }))
+        if (Platform.OS != 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       }} />
     </>})
 
@@ -132,7 +145,7 @@ export function GameScreen({ navigation, route }) {
         <PlayerBoard players={playerList} />
       </View> }
 
-    { trumpCard && <View style={{ position: "absolute", top: 0, right: 0, height: 205, width: 115, margin: 15 }}>
+    { (trumpCard && matchState === MatchState.PLAYING) && <View style={{ position: "absolute", top: 0, right: 0, height: 205, width: 115, margin: 15 }}>
       <Title style={{textAlign: "right"}}>Briscola</Title>
       <Card elevation={3} style={{ position: "absolute", top: 0, right: 0, height: 205, width: 115, backgroundColor: "white", marginTop: 35}}>
         <Text style={{ textAlign: "center", margin: 10, position: "absolute", top: 0, right: 0, left: 0, bottom: 0, color: "black", textTransform: "uppercase", fontSize: 72 }}>{GameCard.getSignEmoji(trumpCard.sign)}</Text>
@@ -176,7 +189,7 @@ export function GameScreen({ navigation, route }) {
           contentContainerStyle={{flexGrow: 1, justifyContent: 'center'}}
           initialNumToRender={6}
           renderItem={({ item }) => <Card elevation={4} style={{ width: 115, height: 205, marginHorizontal: 10, flex: 1, backgroundColor: "white" }}>
-            <TouchableOpacity style={{ width: "100%", height: "100%" }} onPress={ev => {
+            <TouchableOpacity disabled={!cardsAreEnabled} style={{ width: "100%", height: "100%" }} onPress={ev => {
               ws.send(JSON.stringify({
                 type: "playCard",
                 card: item
