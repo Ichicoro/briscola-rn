@@ -5,6 +5,7 @@
     "privacy": "public",
     "sdkVersion": "36.0.0",
     "userInterfaceStyle": "automatic",
+    "primaryColor": "#ff6347",
     "platforms": [
       "ios",
       "android",

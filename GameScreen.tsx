@@ -41,11 +41,12 @@ export function GameScreen({ navigation, route }) {
       setTrumpCard(GameCard.fromData(data.trumpCard))
     } else if (data.type === "state") {
       setMatchState(data.state)
+      navigation.setOptions({ title: ["Waiting", "Playing", "Ended"][data.state] })
     } else if (data.type === "dealtCard") {
       setHand(prevHand => [ ...prevHand, GameCard.fromData(data.card) ].filter((a, b, i) => i.indexOf(a) === b))
     } else if (data.type === "playedCard") {
       setTable(prevTable => [ ...prevTable, GameCard.fromData(data.card) ].filter((a, b, i) => i.indexOf(a) === b))
-      navigation.setOptions({ subtitle: `Next player: ${data.nextPlayer}`})
+      navigation.setOptions({ subtitle: `Next player: ${data.nextPlayer == route.params.username ? "You!" : data.nextPlayer}`})
       console.log(data)
     } else if (data.type === "removeCard") {
       setHand(prevHand => prevHand.filter(c => !c.equals(data.card)))
@@ -68,11 +69,11 @@ export function GameScreen({ navigation, route }) {
     } else if (data.type === "matchEnded") {
       setPlayerList(data.winners)
       setMatchState(MatchState.ENDED)
-      navigation.setOptions({ title: "Match ended", subtitle: `Winner: ${data.winners[0].username}` })
+      navigation.setOptions({ subtitle: `Winner: ${data.winners[0].username}` })
     }
   }
   
-  const [ ws, setWs ] = React.useState(new WebSocket(`ws://${route.params.addr}:777`)) //(() => {
+  const [ ws, setWs ] = React.useState(new WebSocket(`${route.params.secure ? "wss" : "ws"}://${route.params.addr}:1777`)) //(() => {
 
   useEffect(() => {
     navigation.setOptions({ headerRight: () => {
@@ -93,7 +94,7 @@ export function GameScreen({ navigation, route }) {
 
   useEffect(() => {
     ws.onopen = ev => {
-      navigation.setOptions({ title: "Playing" })
+      navigation.setOptions({ title: "Connecting..." })
       ws.send(JSON.stringify({
         type: 'connect',
         username: route.params.username
@@ -108,7 +109,7 @@ export function GameScreen({ navigation, route }) {
       if (ev.reason === "match_in_progress") {
         Alert.alert("Match is already in progress", "Please wait for the match to end.")
       }
-      setSnackbarText("ERROR! Please rejoin :(")
+      navigation.setOptions({ title: "Error", subtitle: `Reason: ${ev.reason}` })
       if (Platform.OS != 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
     }
 
@@ -125,6 +126,7 @@ export function GameScreen({ navigation, route }) {
       <Appbar.Action color="black" key="refresh" icon="refresh" onPress={() => {
         setTable([])
         setHand([])
+        setStack([])
         ws.send(JSON.stringify({ type: "getCurrentState" }))
         if (Platform.OS != 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       }} />
@@ -173,8 +175,8 @@ export function GameScreen({ navigation, route }) {
         />
       </View>
       <View style={{ position: "absolute", top: 275, right: 0, margin: 15, width: 115 }}>
-        <Text style={{ textAlign: "center", width: "100%", fontSize: 24, fontWeight: "800" }}>SCORE</Text>
-        <Text style={{ textAlign: "center", width: "100%", fontSize: 24, fontWeight: "800" }}>{stack.reduce((total, card) => total + GameCard.getPoints(card.type),0)}</Text>
+        <Text style={{ textAlign: "center", width: "100%", fontSize: 24, fontWeight: "700" }}>SCORE</Text>
+        <Text style={{ textAlign: "center", width: "100%", fontSize: 24, fontWeight: "700" }}>{stack.length}{/* stack.reduce((total, card) => total + GameCard.getPoints(card.type),0) */}</Text>
       </View>
     </> }
 
@@ -204,7 +206,7 @@ export function GameScreen({ navigation, route }) {
     </View>
 
     <Snackbar duration={1500} visible={snackbarText != null} onDismiss={() => setSnackbarText(null)}>{snackbarText}</Snackbar>
-    <FAB visible={matchState === MatchState.NOT_STARTED} icon="play" onPress={() => {
+    <FAB visible={matchState === MatchState.NOT_STARTED} disabled={playerList == null || playerList.length == 1} icon="play" label="Start" onPress={() => {
       ws.send(JSON.stringify({ type: "start" }))
     }} style={{ position: 'absolute', margin: 16, right: 0, bottom: 0 }} />
   </Surface>
